@@ -378,3 +378,323 @@ function userFindings(result: AuditResult): Finding[] {
 
   return findings;
 }
+
+// ─── Privileged Role Findings ─────────────────────────────────────────────────
+
+function rolesFindings(
+  result: AuditResult,
+  adminPrincipalIds: Set<string>,
+): Finding[] {
+  const findings: Finding[] = [];
+  const { roleDefinitions, roleAssignments } = result.roles;
+  const now = new Date();
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  const defById = new Map<string, RoleDefinition>();
+  for (const d of roleDefinitions) defById.set(d.id, d);
+
+  const byTemplate = new Map<string, RoleAssignment[]>();
+  for (const a of roleAssignments) {
+    const def = defById.get(a.roleDefinitionId);
+    const tid = def?.templateId ?? '';
+    if (!byTemplate.has(tid)) byTemplate.set(tid, []);
+    byTemplate.get(tid)!.push(a);
+  }
+
+  const globalAdmins = byTemplate.get(GLOBAL_ADMIN_TEMPLATE_ID) ?? [];
+  const gaCount = globalAdmins.length;
+
+  if (gaCount === 0) {
+    findings.push({
+      id: 'roles-no-global-admin',
+      severity: 'critical',
+      category: 'Privileged Access',
+      title: 'No Global Administrator found',
+      description: 'No active Global Administrator assignment was detected. This may indicate a data collection permission issue, but if accurate, the tenant has no emergency admin access.',
+      recommendation: 'Verify Global Admin assignments in Entra ID. Ensure at least 2 break-glass Global Admin accounts exist.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access',
+      effort: 'medium',
+    });
+  } else if (gaCount === 1) {
+    findings.push({
+      id: 'roles-single-global-admin',
+      severity: 'high',
+      category: 'Privileged Access',
+      title: 'Only one Global Administrator account exists',
+      description: 'A single Global Administrator is a lockout risk. If that account is compromised, inaccessible, or loses MFA access, tenant recovery requires contacting Microsoft Support.',
+      recommendation: 'Create a dedicated break-glass emergency access account and assign Global Administrator. Store credentials offline. Exclude from all Conditional Access policies.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access',
+      effort: 'medium',
+    });
+  } else if (gaCount > 5) {
+    findings.push({
+      id: 'roles-excess-global-admins',
+      severity: 'high',
+      category: 'Privileged Access',
+      title: `${gaCount} Global Administrators — exceeds recommended maximum`,
+      description: `This tenant has ${gaCount} Global Administrator accounts. Each is a potential full-tenant compromise vector. The recommended maximum is 4.`,
+      recommendation: 'Review each Global Admin assignment. Reassign to the minimum required role. Retain 2–4 Global Admins maximum.',
+      affectedCount: gaCount,
+      affectedItems: cap(globalAdmins.map(a => a.principal?.userPrincipalName ?? a.principal?.displayName ?? a.principalId)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+      effort: 'medium',
+    });
+  }
+
+  const guestAdmins: string[] = [];
+  for (const assignments of byTemplate.values()) {
+    for (const a of assignments) {
+      if (
+        a.principal?.userType === 'Guest' ||
+        (a.principal?.userPrincipalName ?? '').includes('#EXT#')
+      ) {
+        guestAdmins.push(a.principal?.userPrincipalName ?? a.principal?.displayName ?? a.principalId);
+      }
+    }
+  }
+  if (guestAdmins.length > 0) {
+    findings.push({
+      id: 'roles-guest-in-admin-role',
+      severity: 'critical',
+      category: 'Privileged Access',
+      title: `${guestAdmins.length} guest account${guestAdmins.length !== 1 ? 's' : ''} holding privileged roles`,
+      description: `${guestAdmins.length} external guest account${guestAdmins.length !== 1 ? 's hold' : ' holds'} administrative role assignments. Guest accounts cannot be subject to your internal MFA or Conditional Access policies.`,
+      recommendation: 'Remove guest accounts from all admin roles immediately. Provision a member account under your domain if external admin access is required.',
+      affectedCount: guestAdmins.length,
+      affectedItems: cap(guestAdmins),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+      effort: 'quick-win',
+    });
+  }
+
+  const users = result.users.users;
+  const userByUpn = new Map<string, User>();
+  for (const u of users) userByUpn.set((u.userPrincipalName ?? '').toLowerCase(), u);
+
+  const staleAdminUpns: string[] = [];
+  for (const assignments of byTemplate.values()) {
+    for (const a of assignments) {
+      const upn = (a.principal?.userPrincipalName ?? '').toLowerCase();
+      const user = userByUpn.get(upn);
+      if (!user) continue;
+      const last = user.signInActivity?.lastSignInDateTime;
+      if (last && new Date(last) < ninetyDaysAgo) {
+        staleAdminUpns.push(a.principal?.userPrincipalName ?? a.principalId);
+      }
+    }
+  }
+  const uniqueStaleAdmins = [...new Set(staleAdminUpns)];
+  if (uniqueStaleAdmins.length > 0) {
+    findings.push({
+      id: 'roles-stale-admins',
+      severity: 'high',
+      category: 'Privileged Access',
+      title: `${uniqueStaleAdmins.length} admin account${uniqueStaleAdmins.length !== 1 ? 's' : ''} inactive for 90+ days`,
+      description: `${uniqueStaleAdmins.length} account${uniqueStaleAdmins.length !== 1 ? 's hold' : ' holds'} privileged role assignments but ${uniqueStaleAdmins.length === 1 ? 'has' : 'have'} not signed in for over 90 days.`,
+      recommendation: 'Investigate each stale admin account. Remove role assignments from accounts that are no longer needed.',
+      affectedCount: uniqueStaleAdmins.length,
+      affectedItems: cap(uniqueStaleAdmins),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+      effort: 'medium',
+    });
+  }
+
+  const privRoleAdmins = byTemplate.get('e8611ab8-c189-46e8-94e1-60213ab1f814') ?? [];
+  if (privRoleAdmins.length > 2) {
+    findings.push({
+      id: 'roles-excess-pra',
+      severity: 'medium',
+      category: 'Privileged Access',
+      title: `${privRoleAdmins.length} Privileged Role Administrators`,
+      description: `${privRoleAdmins.length} accounts hold Privileged Role Administrator, which can assign any role including Global Administrator. Recommended maximum is 2.`,
+      recommendation: 'Reduce Privileged Role Administrator assignments to 2 or fewer.',
+      affectedCount: privRoleAdmins.length,
+      affectedItems: cap(privRoleAdmins.map(a => a.principal?.userPrincipalName ?? a.principal?.displayName ?? a.principalId)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Application Findings ─────────────────────────────────────────────────────
+
+function appFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { appRegistrations } = result.applications;
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+  const noOwners = appRegistrations.filter(a => !a.owners || a.owners.length === 0);
+  if (noOwners.length > 0) {
+    findings.push({
+      id: 'apps-no-owners',
+      severity: 'medium',
+      category: 'Applications',
+      title: `${noOwners.length} app registration${noOwners.length !== 1 ? 's' : ''} with no owners`,
+      description: `${noOwners.length} app registration${noOwners.length !== 1 ? 's have' : ' has'} no assigned owner. Ownerless apps have no accountable person to rotate credentials or decommission the app.`,
+      recommendation: 'Assign at least one owner to each app registration.',
+      affectedCount: noOwners.length,
+      affectedItems: cap(noOwners.map(a => a.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps',
+      effort: 'quick-win',
+    });
+  }
+
+  const expiredApps: AppRegistration[] = [];
+  const expiringThirtyApps: AppRegistration[] = [];
+  const expiringSoonApps: AppRegistration[] = [];
+  const oldSecretApps: AppRegistration[] = [];
+
+  for (const app of appRegistrations) {
+    let hasExpired = false, hasThirty = false, hasSoon = false, hasOld = false;
+    for (const secret of app.passwordCredentials) {
+      if (!secret.endDateTime) continue;
+      const end = new Date(secret.endDateTime);
+      if (end < now) hasExpired = true;
+      else if (end <= thirtyDaysFromNow) hasThirty = true;
+      else if (end <= ninetyDaysFromNow) hasSoon = true;
+      if (secret.startDateTime && new Date(secret.startDateTime) < oneYearAgo) hasOld = true;
+    }
+    if (hasExpired) expiredApps.push(app);
+    else if (hasThirty) expiringThirtyApps.push(app);
+    else if (hasSoon) expiringSoonApps.push(app);
+    if (hasOld) oldSecretApps.push(app);
+  }
+
+  if (expiredApps.length > 0) {
+    findings.push({
+      id: 'apps-expired-secrets',
+      severity: 'critical',
+      category: 'Applications',
+      title: `${expiredApps.length} app${expiredApps.length !== 1 ? 's' : ''} with expired client secrets`,
+      description: `${expiredApps.length} app registration${expiredApps.length !== 1 ? 's have' : ' has'} expired client secrets. These applications are likely experiencing authentication failures.`,
+      recommendation: 'Immediately create new client secrets, update application configuration, verify auth, then delete the expired secrets.',
+      affectedCount: expiredApps.length,
+      affectedItems: cap(expiredApps.map(a => a.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+      effort: 'medium',
+    });
+  }
+
+  if (expiringThirtyApps.length > 0) {
+    findings.push({
+      id: 'apps-expiring-secrets',
+      severity: 'high',
+      category: 'Applications',
+      title: `${expiringThirtyApps.length} app${expiringThirtyApps.length !== 1 ? 's' : ''} with secrets expiring within 30 days`,
+      description: `${expiringThirtyApps.length} app registration${expiringThirtyApps.length !== 1 ? 's have' : ' has'} client secrets expiring within 30 days. Failure to rotate will cause application outages.`,
+      recommendation: 'Rotate client secrets now. Create new secret, update app config, verify, then delete old secret.',
+      affectedCount: expiringThirtyApps.length,
+      affectedItems: cap(expiringThirtyApps.map(a => a.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+      effort: 'medium',
+    });
+  }
+
+  if (expiringSoonApps.length > 0) {
+    findings.push({
+      id: 'apps-expiring-secrets-90d',
+      severity: 'medium',
+      category: 'Applications',
+      title: `${expiringSoonApps.length} app${expiringSoonApps.length !== 1 ? 's' : ''} with secrets expiring within 90 days`,
+      description: `${expiringSoonApps.length} app registration${expiringSoonApps.length !== 1 ? 's have' : ' has'} client secrets expiring within 90 days.`,
+      recommendation: 'Schedule secret rotation for each affected application.',
+      affectedCount: expiringSoonApps.length,
+      affectedItems: cap(expiringSoonApps.map(a => a.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+      effort: 'medium',
+    });
+  }
+
+  if (oldSecretApps.length > 0) {
+    findings.push({
+      id: 'apps-old-secrets',
+      severity: 'low',
+      category: 'Applications',
+      title: `${oldSecretApps.length} app${oldSecretApps.length !== 1 ? 's' : ''} with secrets not rotated in 1+ year`,
+      description: `${oldSecretApps.length} app registration${oldSecretApps.length !== 1 ? 's have' : ' has'} client secrets older than 365 days.`,
+      recommendation: 'Rotate secrets and establish a maximum 12-month rotation policy. Consider certificate-based auth.',
+      affectedCount: oldSecretApps.length,
+      affectedItems: cap(oldSecretApps.map(a => a.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Device Findings ──────────────────────────────────────────────────────────
+
+function deviceFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { managedDevices, compliancePolicies } = result.devices;
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  if (managedDevices.length === 0) {
+    findings.push({
+      id: 'devices-no-enrolment',
+      severity: 'high',
+      category: 'Device Compliance',
+      title: 'No devices enrolled in Intune',
+      description: 'No managed devices found in Intune. Without device management, Conditional Access cannot enforce device compliance and security baselines cannot be applied.',
+      recommendation: 'Begin an Intune device enrolment project starting with a Windows pilot group.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/mem/intune/enrollment/device-enrollment',
+      effort: 'project',
+    });
+    return findings;
+  }
+
+  if (compliancePolicies.length === 0) {
+    findings.push({
+      id: 'devices-no-compliance-policy',
+      severity: 'high',
+      category: 'Device Compliance',
+      title: 'No device compliance policies configured',
+      description: `${managedDevices.length} device${managedDevices.length !== 1 ? 's are' : ' is'} enrolled in Intune but no compliance policies exist. All devices default to compliant.`,
+      recommendation: 'Create compliance policies for each platform in Intune defining minimum OS version, encryption, and screen lock requirements.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started',
+      effort: 'medium',
+    });
+  }
+
+  const nonCompliant = managedDevices.filter(d => d.complianceState === 'noncompliant');
+  const nonCompliantRate = nonCompliant.length / managedDevices.length;
+  if (nonCompliant.length > 0 && nonCompliantRate > 0.1) {
+    findings.push({
+      id: 'devices-high-noncompliance',
+      severity: nonCompliantRate > 0.25 ? 'high' : 'medium',
+      category: 'Device Compliance',
+      title: `${nonCompliant.length} non-compliant device${nonCompliant.length !== 1 ? 's' : ''} (${pct(nonCompliant.length, managedDevices.length)})`,
+      description: `${pct(nonCompliant.length, managedDevices.length)} of enrolled devices are non-compliant. If Conditional Access requires device compliance, these users may be blocked.`,
+      recommendation: 'Review each non-compliant device. Remediate OS updates, encryption, and screen lock issues.',
+      affectedCount: nonCompliant.length,
+      affectedItems: cap(nonCompliant.map(d => d.deviceName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started',
+      effort: 'medium',
+    });
+  }
+
+  const staleDevices = managedDevices.filter(d => new Date(d.lastSyncDateTime) < thirtyDaysAgo);
+  if (staleDevices.length > 0) {
+    findings.push({
+      id: 'devices-stale-sync',
+      severity: 'low',
+      category: 'Device Compliance',
+      title: `${staleDevices.length} device${staleDevices.length !== 1 ? 's' : ''} not synced in 30+ days`,
+      description: `${staleDevices.length} enrolled device${staleDevices.length !== 1 ? 's have' : ' has'} not checked in with Intune for over 30 days. Their compliance state may be stale.`,
+      recommendation: 'Retire devices no longer in use. Troubleshoot the Intune management agent on active devices.',
+      affectedCount: staleDevices.length,
+      affectedItems: cap(staleDevices.map(d => d.deviceName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/mem/intune/remote-actions/devices-wipe',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
