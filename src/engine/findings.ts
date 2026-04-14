@@ -698,3 +698,396 @@ function deviceFindings(result: AuditResult): Finding[] {
 
   return findings;
 }
+
+// ─── Identity Protection Findings ─────────────────────────────────────────────
+
+function identityProtectionFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { riskyUsers, riskDetections, limited } = result.identityProtection;
+
+  if (limited) {
+    findings.push({
+      id: 'idp-no-p2',
+      severity: 'info',
+      category: 'Identity Protection',
+      title: 'Identity Protection data unavailable — Entra ID P2 licence required',
+      description: 'Risk detection and risky user data requires Entra ID P2 (or Microsoft 365 E5) licences. This tenant does not appear to have these licences, or the required permissions were not granted.',
+      recommendation: 'Consider upgrading to Entra ID P2 to gain access to risk-based sign-in policies, risky user detection, and leaked credential monitoring.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/overview-identity-protection',
+      effort: 'project',
+    });
+    return findings;
+  }
+
+  const highRisk = riskyUsers.filter(u => u.riskLevel === 'high');
+  if (highRisk.length > 0) {
+    findings.push({
+      id: 'idp-high-risk-users',
+      severity: 'critical',
+      category: 'Identity Protection',
+      title: `${highRisk.length} high-risk user${highRisk.length !== 1 ? 's' : ''} detected`,
+      description: `${highRisk.length} account${highRisk.length !== 1 ? 's are' : ' is'} flagged as high risk by Entra ID Identity Protection. These accounts may have leaked credentials, impossible travel, or other indicators of compromise.`,
+      recommendation: 'Investigate each high-risk user immediately. Require password reset and MFA re-registration. Review recent sign-in activity for suspicious behaviour.',
+      affectedCount: highRisk.length,
+      affectedItems: cap(highRisk.map(u => u.userPrincipalName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-remediate-unblock',
+      effort: 'medium',
+    });
+  }
+
+  const medRisk = riskyUsers.filter(u => u.riskLevel === 'medium');
+  if (medRisk.length > 0) {
+    findings.push({
+      id: 'idp-medium-risk-users',
+      severity: 'high',
+      category: 'Identity Protection',
+      title: `${medRisk.length} medium-risk user${medRisk.length !== 1 ? 's' : ''} detected`,
+      description: `${medRisk.length} account${medRisk.length !== 1 ? 's are' : ' is'} flagged as medium risk. These may represent unfamiliar sign-in properties, atypical travel, or other anomalies.`,
+      recommendation: 'Review each medium-risk user\'s recent sign-in activity. Require MFA confirmation or password reset for affected accounts.',
+      affectedCount: medRisk.length,
+      affectedItems: cap(medRisk.map(u => u.userPrincipalName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-remediate-unblock',
+      effort: 'medium',
+    });
+  }
+
+  const recentDetections = riskDetections.filter(d => {
+    const detected = new Date(d.detectedDateTime);
+    return detected > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  });
+  if (recentDetections.length > 0 && highRisk.length === 0 && medRisk.length === 0) {
+    findings.push({
+      id: 'idp-recent-detections',
+      severity: 'medium',
+      category: 'Identity Protection',
+      title: `${recentDetections.length} risk detection${recentDetections.length !== 1 ? 's' : ''} in the past 30 days`,
+      description: `${recentDetections.length} risk event${recentDetections.length !== 1 ? 's were' : ' was'} detected in the last 30 days. Review these events to confirm they were legitimate sign-ins.`,
+      recommendation: 'Review recent risk detections in Entra ID Protection. Confirm remediated events and investigate any that appear suspicious.',
+      affectedCount: recentDetections.length,
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── External Collaboration Findings ─────────────────────────────────────────
+
+function externalCollabFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { authorizationPolicy } = result.externalCollab;
+  if (!authorizationPolicy) return findings;
+
+  if (authorizationPolicy.allowInvitesFrom === 'everyone') {
+    findings.push({
+      id: 'extcollab-open-guest-invite',
+      severity: 'high',
+      category: 'External Collaboration',
+      title: 'Anyone — including existing guests — can invite external users',
+      description: 'The guest invitation setting is configured to "anyone", meaning existing guest accounts can invite additional external users without admin approval. This allows uncontrolled growth of the guest population.',
+      recommendation: 'Change the guest invite setting to "adminsAndGuestInviters" or "adminsGuestInvitersAndAllMembers" in Entra ID External Identities settings.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure',
+      effort: 'quick-win',
+    });
+  }
+
+  if (authorizationPolicy.allowEmailVerifiedUsersToJoinOrganization) {
+    findings.push({
+      id: 'extcollab-email-verified-join',
+      severity: 'high',
+      category: 'External Collaboration',
+      title: 'Email-verified users can join organisation without invitation',
+      description: 'The tenant allows any email-verified user to join the organisation without an explicit invitation. This enables open self-registration from external parties.',
+      recommendation: 'Disable "Allow email-verified users to join your organization" in Entra ID External Identities → External collaboration settings.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure',
+      effort: 'quick-win',
+    });
+  }
+
+  // Guest user role ID: 10dae51f-b6af-4016-8d66-8c2a99b929b3 = same as member (most permissive)
+  const memberLikeGuestRoleId = '10dae51f-b6af-4016-8d66-8c2a99b929b3';
+  if (authorizationPolicy.guestUserRoleId === memberLikeGuestRoleId) {
+    findings.push({
+      id: 'extcollab-guest-full-access',
+      severity: 'medium',
+      category: 'External Collaboration',
+      title: 'Guests have the same access as member users',
+      description: 'The guest user access level is set to allow guests the same permissions as members. This gives external users full visibility of the directory, including enumerating all users, groups, and other guests.',
+      recommendation: 'Change guest access to "Guest users have limited access to properties and memberships of directory objects" in External Identities → External collaboration settings.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions',
+      effort: 'quick-win',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Groups & Governance Findings ────────────────────────────────────────────
+
+function groupsFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { lifecyclePolicies, settings, groups } = result.groups;
+
+  if (lifecyclePolicies.length === 0) {
+    findings.push({
+      id: 'governance-no-group-expiry',
+      severity: 'medium',
+      category: 'Governance',
+      title: 'No Microsoft 365 group expiration policy configured',
+      description: 'Without a group expiration policy, Microsoft 365 groups and Teams accumulate indefinitely. Abandoned groups retain access to SharePoint sites, mailboxes, and other data.',
+      recommendation: 'Configure a group expiration policy in Entra ID → Groups → Expiration. Set lifetime to 180 or 365 days. Group owners receive renewal prompts automatically.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/entra/identity/users/groups-lifecycle',
+      effort: 'quick-win',
+    });
+  }
+
+  const groupCreationSetting = settings.find(s =>
+    s.values.some(v => v.name === 'EnableGroupCreation'),
+  );
+  const groupCreationOpen = groupCreationSetting
+    ? groupCreationSetting.values.find(v => v.name === 'EnableGroupCreation')?.value !== 'false'
+    : true;
+
+  if (groupCreationOpen) {
+    findings.push({
+      id: 'governance-open-group-creation',
+      severity: 'medium',
+      category: 'Governance',
+      title: 'All users can create Microsoft 365 groups and Teams',
+      description: 'Group creation is not restricted — any user can create Microsoft 365 groups and Microsoft Teams without admin approval. This leads to group sprawl and shadow IT.',
+      recommendation: 'Restrict group creation to a designated security group (e.g. "IT-Approved-Group-Creators") using directory settings in Entra ID.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/manage-creation-of-groups',
+      effort: 'medium',
+    });
+  }
+
+  const groupsNoOwner = groups.filter(g => !g.owners || g.owners.length === 0);
+  if (groupsNoOwner.length > 0) {
+    findings.push({
+      id: 'governance-groups-no-owners',
+      severity: 'low',
+      category: 'Governance',
+      title: `${groupsNoOwner.length} Microsoft 365 group${groupsNoOwner.length !== 1 ? 's' : ''} with no owners`,
+      description: `${groupsNoOwner.length} Microsoft 365 group${groupsNoOwner.length !== 1 ? 's have' : ' has'} no assigned owner. Ownerless groups cannot receive expiration renewal requests and have no accountable administrator.`,
+      recommendation: 'Assign owners to all Microsoft 365 groups. Use the group expiration policy to surface ownerless groups for cleanup.',
+      affectedCount: groupsNoOwner.length,
+      affectedItems: cap(groupsNoOwner.map(g => g.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/microsoft-365-groups-expiration-policy',
+      effort: 'medium',
+    });
+  }
+
+  const publicGroups = groups.filter(g => g.visibility === 'Public');
+  if (publicGroups.length > 10) {
+    findings.push({
+      id: 'governance-public-groups',
+      severity: 'info',
+      category: 'Governance',
+      title: `${publicGroups.length} public Microsoft 365 groups`,
+      description: `${publicGroups.length} Microsoft 365 groups are set to Public visibility, meaning any user in the tenant can view content and join without approval.`,
+      recommendation: 'Review public groups and change sensitive ones to Private. Ensure public groups only contain information appropriate for all-staff visibility.',
+      affectedCount: publicGroups.length,
+      affectedItems: cap(publicGroups.map(g => g.displayName)),
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/groups-teams-access-governance',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Email Security Findings ──────────────────────────────────────────────────
+
+function emailFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { spfRecord, dmarcRecord, dkim1Record, dkim2Record, mxRecords, domain } = result.emailSecurity;
+
+  if (!domain) return findings;
+
+  if (!spfRecord) {
+    findings.push({
+      id: 'email-no-spf',
+      severity: 'critical',
+      category: 'Email Security',
+      title: `No SPF record found for ${domain}`,
+      description: `The domain ${domain} has no SPF record. Without SPF, any server on the internet can send email appearing to originate from this domain, enabling phishing and spoofing attacks.`,
+      recommendation: 'Add a TXT record at the root domain: v=spf1 include:spf.protection.outlook.com -all',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-spf-configure',
+      effort: 'medium',
+    });
+  } else if (!spfRecord.includes('-all')) {
+    const level = spfRecord.includes('?all') ? 'critical' : 'high';
+    findings.push({
+      id: 'email-spf-not-enforced',
+      severity: level,
+      category: 'Email Security',
+      title: `SPF record uses ${spfRecord.includes('?all') ? '?all (neutral)' : '~all (soft fail)'} — not enforced`,
+      description: `The SPF record for ${domain} ends with ${spfRecord.includes('?all') ? '?all' : '~all'}, which does not instruct receiving servers to reject spoofed email. Only -all (hard fail) prevents delivery of unauthorised email.`,
+      recommendation: 'Update the SPF TXT record to end with -all instead of ~all or ?all after confirming all legitimate sending sources are included.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-spf-configure',
+      effort: 'quick-win',
+    });
+  }
+
+  // SPF duplicate check — multiple SPF records is invalid
+  // (We only get the first matching one from DNS, so we note this is a best-effort check)
+
+  if (!dmarcRecord) {
+    findings.push({
+      id: 'email-no-dmarc',
+      severity: 'critical',
+      category: 'Email Security',
+      title: `No DMARC record found for ${domain}`,
+      description: `The domain ${domain} has no DMARC record. Even with SPF and DKIM configured, without DMARC receiving servers have no instruction on how to handle email that fails authentication.`,
+      recommendation: 'Add a TXT record at _dmarc.' + domain + ' starting with p=none to begin monitoring, then escalate to p=quarantine and p=reject after reviewing reports.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+      effort: 'medium',
+    });
+  } else if (dmarcRecord.includes('p=none')) {
+    findings.push({
+      id: 'email-dmarc-not-enforced',
+      severity: 'high',
+      category: 'Email Security',
+      title: `DMARC policy is p=none — no enforcement`,
+      description: `The DMARC record for ${domain} has p=none, meaning receiving servers take no action on email that fails authentication. DMARC exists but provides no protection.`,
+      recommendation: 'Review DMARC aggregate reports to confirm all legitimate mail passes, then escalate to p=quarantine and eventually p=reject.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+      effort: 'medium',
+    });
+  } else if (!dmarcRecord.includes('rua=')) {
+    findings.push({
+      id: 'email-dmarc-no-reporting',
+      severity: 'low',
+      category: 'Email Security',
+      title: 'DMARC record has no reporting address (rua=)',
+      description: `The DMARC record for ${domain} does not include an rua= reporting address. Without reporting, there is no visibility into authentication failures or spoofing attempts.`,
+      recommendation: 'Add rua=mailto:dmarc-reports@' + domain + ' to the DMARC record to receive aggregate reports.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+      effort: 'quick-win',
+    });
+  }
+
+  if (!dkim1Record && !dkim2Record) {
+    findings.push({
+      id: 'email-no-dkim',
+      severity: 'high',
+      category: 'Email Security',
+      title: `DKIM not configured for ${domain}`,
+      description: `No DKIM TXT records were found at selector1._domainkey.${domain} or selector2._domainkey.${domain}. Without DKIM, email cannot be cryptographically verified and DMARC alignment may fail.`,
+      recommendation: 'Enable DKIM signing in Microsoft Defender (security.microsoft.com → Email & collaboration → Policies → DKIM) and publish the CNAME records provided.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dkim-configure',
+      effort: 'medium',
+    });
+  }
+
+  const exchangeOnlineMx = mxRecords.some(r => r.includes('mail.protection.outlook.com'));
+  if (mxRecords.length > 0 && !exchangeOnlineMx) {
+    findings.push({
+      id: 'email-third-party-mx',
+      severity: 'info',
+      category: 'Email Security',
+      title: 'MX records do not point to Exchange Online',
+      description: `The MX records for ${domain} do not point to mail.protection.outlook.com. This tenant may be using a third-party mail gateway or mail filtering service. SPF/DKIM/DMARC configuration may need to account for the gateway.`,
+      recommendation: 'Ensure SPF includes the third-party mail gateway\'s sending IPs. Confirm DKIM is signing from the gateway. Verify DMARC alignment.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-about',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Secure Score Findings ────────────────────────────────────────────────────
+
+function secureScoreFindings(result: AuditResult): Finding[] {
+  const findings: Finding[] = [];
+  const { secureScores } = result.secureScore;
+  if (!secureScores.length) return findings;
+
+  const latest = secureScores[0];
+  const pctScore = Math.round((latest.currentScore / latest.maxScore) * 100);
+
+  if (pctScore < 50) {
+    findings.push({
+      id: 'securescore-low',
+      severity: 'high',
+      category: 'Secure Score',
+      title: `Microsoft Secure Score is ${pctScore}% (${Math.round(latest.currentScore)}/${Math.round(latest.maxScore)})`,
+      description: `This tenant's Microsoft Secure Score is ${pctScore}%, indicating a significant number of recommended security controls are not yet implemented. Secure Score measures identity, data, devices, and app security posture.`,
+      recommendation: 'Review the Recommended Actions in Microsoft Defender (security.microsoft.com → Secure Score). Prioritise identity-related actions first — filter by Category: Identity and sort by Points impact.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/defender/microsoft-secure-score-improvement-actions',
+      effort: 'medium',
+    });
+  } else if (pctScore < 70) {
+    findings.push({
+      id: 'securescore-low',
+      severity: 'medium',
+      category: 'Secure Score',
+      title: `Microsoft Secure Score is ${pctScore}% (${Math.round(latest.currentScore)}/${Math.round(latest.maxScore)})`,
+      description: `This tenant's Secure Score is ${pctScore}%. There are improvement opportunities across identity, device, and data controls.`,
+      recommendation: 'Work through the top Recommended Actions in Microsoft Defender Secure Score, prioritising the highest point-value items.',
+      learnMoreUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/defender/microsoft-secure-score-improvement-actions',
+      effort: 'medium',
+    });
+  }
+
+  return findings;
+}
+
+// ─── Sorting ──────────────────────────────────────────────────────────────────
+
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
+
+function sortFindings(findings: Finding[]): Finding[] {
+  return [...findings].sort((a, b) => {
+    const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+    if (sev !== 0) return sev;
+    return (b.affectedCount ?? 0) - (a.affectedCount ?? 0);
+  });
+}
+
+// ─── Admin principal IDs helper ───────────────────────────────────────────────
+
+export function buildAdminPrincipalIds(result: AuditResult): Set<string> {
+  const defById = new Map<string, { templateId: string }>();
+  for (const d of result.roles.roleDefinitions) {
+    defById.set(d.id, { templateId: d.templateId });
+  }
+  const ids = new Set<string>();
+  for (const a of result.roles.roleAssignments) {
+    const def = defById.get(a.roleDefinitionId);
+    if (def && PRIVILEGED_ROLE_TEMPLATE_IDS[def.templateId]) {
+      ids.add(a.principalId);
+    }
+  }
+  return ids;
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export function generateFindings(result: AuditResult): Finding[] {
+  const adminPrincipalIds = buildAdminPrincipalIds(result);
+
+  const all: Finding[] = [
+    ...mfaFindings(result, adminPrincipalIds),
+    ...caFindings(result),
+    ...userFindings(result),
+    ...rolesFindings(result, adminPrincipalIds),
+    ...appFindings(result),
+    ...deviceFindings(result),
+    ...identityProtectionFindings(result),
+    ...externalCollabFindings(result),
+    ...groupsFindings(result),
+    ...emailFindings(result),
+    ...secureScoreFindings(result),
+  ];
+
+  return sortFindings(all);
+}
