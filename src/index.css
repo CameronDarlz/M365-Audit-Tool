@@ -65,3 +65,19 @@ html, body {
 .pulse-dot {
   animation: pulse-dot 1.4s ease-in-out infinite;
 }
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html, body {
+    background: white !important;
+    color: #111 !important;
+  }
+
+  #root > * > *:not(.print-report) {
+    display: none !important;
+  }
+}
