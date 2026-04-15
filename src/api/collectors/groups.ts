@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGetAll } from '../graphClient';
-import { GroupsData, GroupLifecyclePolicy, Group, DirectorySetting } from '../../types/audit';
+import type { GroupsData, GroupLifecyclePolicy, Group, DirectorySetting } from '../../types/audit';
 
 export async function collectGroups(
   instance: IPublicClientApplication,

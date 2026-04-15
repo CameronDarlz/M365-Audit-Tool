@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGetAll } from '../graphClient';
-import { ConditionalAccessData, ConditionalAccessPolicy, NamedLocation } from '../../types/audit';
+import type { ConditionalAccessData, ConditionalAccessPolicy, NamedLocation } from '../../types/audit';
 
 export async function collectConditionalAccess(
   instance: IPublicClientApplication,

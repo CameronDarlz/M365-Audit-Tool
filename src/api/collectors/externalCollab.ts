@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGet } from '../graphClient';
-import { ExternalCollabData, ExternalIdentitiesPolicy, AuthorizationPolicy } from '../../types/audit';
+import type { ExternalCollabData, ExternalIdentitiesPolicy, AuthorizationPolicy } from '../../types/audit';
 
 export async function collectExternalCollab(
   instance: IPublicClientApplication,

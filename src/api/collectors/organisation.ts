@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGet } from '../graphClient';
-import { OrgData, Organization } from '../../types/audit';
+import type { OrgData, Organization } from '../../types/audit';
 
 interface OrgListResponse {
   value: Organization[];

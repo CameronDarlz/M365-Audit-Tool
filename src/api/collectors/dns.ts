@@ -1,4 +1,4 @@
-import { EmailSecurityData, DnsResponse } from '../../types/audit';
+import type { EmailSecurityData, DnsResponse } from '../../types/audit';
 
 const DNS_API = 'https://dns.google/resolve';
 

@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGetAll } from '../graphClient';
-import { SecureScoreData, SecureScore } from '../../types/audit';
+import type { SecureScoreData, SecureScore } from '../../types/audit';
 
 export async function collectSecureScore(
   instance: IPublicClientApplication,

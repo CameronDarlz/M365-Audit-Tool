@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGetAll, safeGraphGet } from '../graphClient';
-import { MfaData, UserRegistrationDetail, AuthMethodsPolicy } from '../../types/audit';
+import type { MfaData, UserRegistrationDetail, AuthMethodsPolicy } from '../../types/audit';
 
 export async function collectMfa(
   instance: IPublicClientApplication,

@@ -1,6 +1,6 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { safeGraphGetAll } from '../graphClient';
-import { RolesData, RoleDefinition, RoleAssignment } from '../../types/audit';
+import type { RolesData, RoleDefinition, RoleAssignment } from '../../types/audit';
 
 export async function collectRoles(
   instance: IPublicClientApplication,
