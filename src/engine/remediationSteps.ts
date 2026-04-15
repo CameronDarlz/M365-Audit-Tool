@@ -201,4 +201,223 @@ export const remediationSteps: Record<string, RemediationGuide> = {
     caveats: 'Always review the report-only impact before enforcing. Check for service accounts or legacy systems that may be affected.',
   },
 
+  // ─── Users & Accounts ─────────────────────────────────────────────────────
+
+  'users-blocked-with-licence': {
+    whyItMatters: 'Disabled accounts retaining licences waste budget and may retain delegated mailbox access or group memberships that could be exploited.',
+    steps: [
+      'Open admin.microsoft.com → Users → Active users. Filter by "Sign-in blocked".',
+      'Alternatively, use the affected account list from the Users & Accounts tab in this tool.',
+      'For each blocked account: select the user → Licences and apps → uncheck all licences → Save.',
+      'Verify the account has no active shared mailbox delegation or distribution list membership.',
+      'Reclaim the freed licences for active users or reduce the licence count at next renewal.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/admin/manage/remove-licenses-from-users',
+  },
+
+  'users-stale-accounts': {
+    whyItMatters: 'Accounts inactive for 90+ days likely belong to former employees or unused service accounts and represent unnecessary attack surface and licence cost.',
+    steps: [
+      'Export the stale account list from the Users & Accounts tab.',
+      'Cross-reference with HR to confirm which accounts belong to former employees.',
+      'For confirmed leavers: block sign-in immediately, remove licences, and schedule deletion after 30 days.',
+      'For unconfirmed accounts: contact the account owner\'s manager to verify status.',
+      'For service accounts: document their purpose. If unused, disable and monitor for 30 days before deleting.',
+    ],
+    estimatedMinutes: 45,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/monitoring-health/howto-manage-inactive-user-accounts',
+    caveats: 'Do not delete accounts immediately — disable first and wait 30 days to catch dependencies that were not apparent.',
+  },
+
+  'users-excess-guests': {
+    whyItMatters: 'A large unmanaged guest population increases exposure and complicates data access governance. Former partner or vendor guests may retain access after the relationship ends.',
+    steps: [
+      'Navigate to entra.microsoft.com → Users → All users → Filter by User type: Guest.',
+      'Export the guest list.',
+      'For each guest, confirm whether they still require access by contacting the inviting user or manager.',
+      'Remove guests that no longer require access: select user → Delete.',
+      'Consider enabling Access Reviews in Entra ID Governance for ongoing quarterly guest reviews.',
+    ],
+    estimatedMinutes: 45,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions',
+    caveats: 'Deleting a guest removes their access to all shared resources. Confirm with the inviting business owner before removing.',
+  },
+
+  'users-password-never-expires': {
+    whyItMatters: 'Non-expiring passwords on accounts without strong MFA increase the window of opportunity if credentials are ever compromised.',
+    steps: [
+      'Cross-reference these accounts against MFA registration data (MFA & Auth tab).',
+      'For any account with a non-expiring password that is NOT protected by MFA, enforce MFA registration immediately.',
+      'To change the password policy for cloud-only accounts: admin.microsoft.com → Settings → Org settings → Security & privacy → Password expiration policy.',
+      'For hybrid accounts, update the policy via on-premises Active Directory.',
+      'Note: Non-expiring passwords are acceptable for cloud-only accounts that are fully protected by MFA and Conditional Access.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/admin/misc/password-policy-recommendations',
+  },
+
+  'users-never-signed-in': {
+    whyItMatters: 'Accounts created more than 30 days ago that have never been used are likely provisioning errors or orphaned accounts, and represent unmonitored access.',
+    steps: [
+      'Review each account in the affected list.',
+      'Check whether the account has an assigned manager or department.',
+      'Contact the account\'s manager or HR to confirm if the account is expected.',
+      'Disable accounts that cannot be confirmed as intentional.',
+      'Delete after 30 days if no service failures are observed.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/monitoring-health/howto-manage-inactive-user-accounts',
+  },
+
+  // ─── Privileged Roles ─────────────────────────────────────────────────────
+
+  'roles-no-global-admin': {
+    whyItMatters: 'Without a reachable Global Administrator, critical tenant operations and security responses are blocked until Microsoft Support restores access.',
+    steps: [
+      'Navigate to entra.microsoft.com → Roles and administrators → Global Administrator.',
+      'If no accounts are listed, contact Microsoft Support immediately.',
+      'Create a dedicated break-glass account (e.g. breakglass@yourdomain.com).',
+      'Assign Global Administrator to this account.',
+      'Store the credentials in a physical safe or offline password manager.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access',
+  },
+
+  'roles-single-global-admin': {
+    whyItMatters: 'A single Global Admin is a lockout risk. If the account is compromised, loses MFA access, or is unavailable, tenant recovery requires Microsoft Support.',
+    steps: [
+      'Create a dedicated break-glass emergency access account.',
+      'Use a format like breakglass@yourdomain.com — not tied to any individual.',
+      'Set a strong random password (20+ characters). Store it in a physical safe or offline password manager.',
+      'Exclude this account from all Conditional Access policies.',
+      'Assign Global Administrator role to this account.',
+      'Set up an alert to notify when this account signs in — it should never sign in under normal operations.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access',
+  },
+
+  'roles-excess-global-admins': {
+    whyItMatters: 'Each Global Admin account is a potential full-tenant compromise vector. Reducing the count minimises the blast radius of a credential breach.',
+    steps: [
+      'Navigate to entra.microsoft.com → Roles and administrators → Global Administrator.',
+      'Review each account listed.',
+      'For each admin that does not require full Global Admin access, identify the minimum required role: Exchange Admin, User Admin, Security Admin, etc.',
+      'Click the account → Remove assignment from Global Administrator.',
+      'Assign the appropriate scoped role instead.',
+      'Retain 2–4 Global Admin accounts maximum, including at least one break-glass account.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+  },
+
+  'roles-guest-in-admin-role': {
+    whyItMatters: 'Guest accounts originate outside your organisation and cannot be subject to your internal identity governance policies. An external user holding an admin role is a critical exposure.',
+    steps: [
+      'Navigate to entra.microsoft.com → Roles and administrators.',
+      'For each privileged role, check the member list for guest accounts (identified by #EXT# in UPN).',
+      'Remove the guest from the admin role immediately.',
+      'If the external party requires administrative access, create a member account under your domain for them instead.',
+    ],
+    estimatedMinutes: 15,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+  },
+
+  'roles-stale-admins': {
+    whyItMatters: 'Dormant admin accounts hold elevated privileges that can be exploited long after the original user stopped working. They are unlikely to notice a compromise.',
+    steps: [
+      'Export the stale admin list from the Privileged Access tab.',
+      'For each account, confirm the user\'s employment status with HR.',
+      'For former employees: remove all role assignments immediately and block sign-in.',
+      'For active employees who no longer need the role: remove the assignment.',
+      'For service accounts with admin roles: document the necessity or replace with a managed identity or service principal with scoped permissions.',
+    ],
+    estimatedMinutes: 45,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+    caveats: 'Remove role assignments before disabling accounts to avoid confusion in future audits.',
+  },
+
+  'roles-excess-pra': {
+    whyItMatters: 'Privileged Role Administrator can assign any role including Global Administrator. Too many holders creates uncontrolled privilege escalation paths.',
+    steps: [
+      'Navigate to entra.microsoft.com → Roles and administrators → Privileged Role Administrator.',
+      'Review the list of current holders.',
+      'Retain a maximum of 2 accounts in this role.',
+      'Remove assignments for all others — reassign to Security Administrator or Global Administrator as appropriate.',
+      'Consider using Privileged Identity Management (PIM) to make this role eligible rather than permanently assigned (requires P2).',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices',
+  },
+
+  // ─── Applications ─────────────────────────────────────────────────────────
+
+  'apps-no-owners': {
+    whyItMatters: 'App registrations without owners have no accountable person to rotate credentials, review permissions, or decommission the app when no longer needed.',
+    steps: [
+      'Navigate to entra.microsoft.com → App registrations → select the affected application.',
+      'Go to Owners → Add owners.',
+      'Assign at least one owner who is responsible for the application.',
+      'Document the app\'s purpose in the Notes field under Branding & properties.',
+    ],
+    estimatedMinutes: 10,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps',
+  },
+
+  'apps-expired-secrets': {
+    whyItMatters: 'Expired client secrets cause immediate application authentication failures and service outages.',
+    steps: [
+      'Navigate to entra.microsoft.com → App registrations → select the affected application.',
+      'Go to Certificates & secrets → New client secret.',
+      'Set an expiry of 12 months (or less). Copy the new secret value immediately — it is only shown once.',
+      'Update the secret in the application\'s configuration (app settings, Key Vault, or wherever it is stored).',
+      'Verify the application authenticates successfully with the new secret.',
+      'Delete the old expired secret.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+    caveats: 'Coordinate with the application owner before rotating secrets. Rotating without updating the app config will cause immediate auth failures.',
+  },
+
+  'apps-expiring-secrets': {
+    whyItMatters: 'Expiring secrets are a known, predictable outage risk. Rotation must be planned and coordinated before the expiry date.',
+    steps: [
+      'Navigate to entra.microsoft.com → App registrations → select the affected application.',
+      'Go to Certificates & secrets → New client secret.',
+      'Set an expiry of 12 months. Copy the new secret value immediately.',
+      'Update the secret in the application\'s configuration.',
+      'Verify authentication works with the new secret.',
+      'Delete the old expiring secret once confirmed working.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+    caveats: 'Coordinate with the application owner. Do not rotate without updating the config first.',
+  },
+
+  'apps-expiring-secrets-90d': {
+    whyItMatters: 'Secrets expiring within 90 days need to be scheduled for rotation to avoid a future outage.',
+    steps: [
+      'Add secret rotation tasks to your team\'s backlog for each affected application.',
+      'Contact each app owner to confirm the rotation process and who holds the configuration access.',
+      'Rotate each secret using the same process as apps-expiring-secrets.',
+      'Consider moving to certificate-based authentication or managed identities for apps that support it.',
+    ],
+    estimatedMinutes: 15,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+  },
+
+  'apps-old-secrets': {
+    whyItMatters: 'Long-lived secrets that are never rotated become a significant risk if credentials are ever leaked — attackers may have had access for an extended period without detection.',
+    steps: [
+      'Review each affected application in entra.microsoft.com → App registrations.',
+      'Rotate the secret using the process in apps-expiring-secrets.',
+      'Establish a policy: maximum 12-month secret lifetime. Set calendar reminders or use Azure Key Vault with automatic rotation.',
+      'Consider migrating high-privilege apps to certificate-based authentication, which is more secure than secrets.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
+  },
+
 };
