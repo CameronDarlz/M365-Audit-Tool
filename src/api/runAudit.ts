@@ -1,5 +1,5 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
-import { AuditResult, CollectorState } from '../types/audit';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
+import type { AuditResult, CollectorState } from '../types/audit';
 import { collectOrganisation } from './collectors/organisation';
 import { collectUsers } from './collectors/users';
 import { collectMfa } from './collectors/mfa';

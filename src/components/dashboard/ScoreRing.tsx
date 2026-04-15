@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { gradeColor, scoreToGrade } from '../../lib/utils';
-import { CategoryScore } from '../../types/audit';
+import type { CategoryScore } from '../../types/audit';
 
 interface ScoreRingProps {
   score: number;

@@ -1,8 +1,6 @@
-import {
+import type {
   AuditResult,
   Finding,
-  UserRegistrationDetail,
-  ConditionalAccessPolicy,
   RoleAssignment,
   RoleDefinition,
   AppRegistration,
@@ -383,7 +381,6 @@ function userFindings(result: AuditResult): Finding[] {
 
 function rolesFindings(
   result: AuditResult,
-  adminPrincipalIds: Set<string>,
 ): Finding[] {
   const findings: Finding[] = [];
   const { roleDefinitions, roleAssignments } = result.roles;
@@ -1079,7 +1076,7 @@ export function generateFindings(result: AuditResult): Finding[] {
     ...mfaFindings(result, adminPrincipalIds),
     ...caFindings(result),
     ...userFindings(result),
-    ...rolesFindings(result, adminPrincipalIds),
+    ...rolesFindings(result),
     ...appFindings(result),
     ...deviceFindings(result),
     ...identityProtectionFindings(result),

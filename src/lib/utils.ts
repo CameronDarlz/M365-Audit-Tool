@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Severity, CategoryScore } from '../types/audit';
+import type { Severity, CategoryScore } from '../types/audit';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

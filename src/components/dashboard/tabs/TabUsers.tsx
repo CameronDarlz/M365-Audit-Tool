@@ -1,4 +1,4 @@
-import { UsersData, LicencesData, Finding, CategoryScore } from '../../../types/audit';
+import type { UsersData, LicencesData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
 import { pct, daysSince, formatDate, downloadCsv } from '../../../lib/utils';

@@ -1,4 +1,4 @@
-import { CategoryScore, AuditResult, UserRegistrationDetail, ConditionalAccessPolicy } from '../types/audit';
+import type { CategoryScore, AuditResult, UserRegistrationDetail, ConditionalAccessPolicy } from '../types/audit';
 
 export const CATEGORY_WEIGHTS: Record<string, number> = {
   mfa: 0.22,
@@ -29,7 +29,6 @@ export function scoreMfa(
   registrationDetails: UserRegistrationDetail[],
   adminIds: Set<string>,
 ): { score: number; mfaRate: number; adminMfaRate: number; strongMethodRate: number } {
-  const licensedMembers = registrationDetails.filter(u => !u.isAdmin || adminIds.has(u.id));
   const total = registrationDetails.length;
   if (total === 0) return { score: 0, mfaRate: 0, adminMfaRate: 0, strongMethodRate: 0 };
 

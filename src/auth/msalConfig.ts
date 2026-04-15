@@ -1,4 +1,4 @@
-import { Configuration, PopupRequest } from '@azure/msal-browser';
+import { type Configuration, type PopupRequest } from '@azure/msal-browser';
 
 export const msalConfig: Configuration = {
   auth: {
@@ -8,7 +8,6 @@ export const msalConfig: Configuration = {
   },
   cache: {
     cacheLocation: 'sessionStorage',
-    storeAuthStateInCookie: false,
   },
   system: {
     allowRedirectInIframe: false,

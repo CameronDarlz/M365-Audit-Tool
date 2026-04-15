@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ScoredAudit } from '../../../types/audit';
+import type { ScoredAudit } from '../../../types/audit';
 import { remediationSteps } from '../../../engine/remediationSteps';
 import { gradeColor, severityColor, effortMinutesLabel, formatDateTime } from '../../../lib/utils';
 import { Printer } from 'lucide-react';

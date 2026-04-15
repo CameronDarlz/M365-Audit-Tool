@@ -1,4 +1,4 @@
-import { IPublicClientApplication, AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const GRAPH_BETA = 'https://graph.microsoft.com/beta';

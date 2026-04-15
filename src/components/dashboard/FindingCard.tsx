@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { Finding } from '../../types/audit';
+import type { Finding } from '../../types/audit';
 import { cn, severityBg, severityColor, effortLabel } from '../../lib/utils';
 
 interface FindingCardProps {

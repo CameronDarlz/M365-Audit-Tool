@@ -1,4 +1,4 @@
-import { GroupsData, ExternalCollabData, Finding, CategoryScore } from '../../../types/audit';
+import type { GroupsData, ExternalCollabData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
 import { CheckCircle2, XCircle, Users } from 'lucide-react';

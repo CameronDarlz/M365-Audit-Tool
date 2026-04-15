@@ -1,8 +1,7 @@
-import { DevicesData } from '../../../types/audit';
+import type { DevicesData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
-import { Finding, CategoryScore } from '../../../types/audit';
-import { pct, formatDateTime, daysSince, downloadCsv } from '../../../lib/utils';
+import { pct, daysSince, downloadCsv } from '../../../lib/utils';
 import { Download, Monitor, ShieldCheck, ShieldX, Clock, Laptop, Smartphone, Apple, HelpCircle } from 'lucide-react';
 
 interface TabDevicesProps {

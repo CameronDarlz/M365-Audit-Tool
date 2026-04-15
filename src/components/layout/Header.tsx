@@ -1,6 +1,6 @@
 import { useMsal } from '@azure/msal-react';
 import { LogOut, RefreshCw, Shield } from 'lucide-react';
-import { Organization } from '../../types/audit';
+import type { Organization } from '../../types/audit';
 
 interface HeaderProps {
   organization?: Organization | null;

@@ -1,4 +1,4 @@
-import { RolesData, MfaData, UsersData, Finding, CategoryScore } from '../../../types/audit';
+import type { RolesData, MfaData, UsersData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
 import { PRIVILEGED_ROLE_TEMPLATE_IDS } from '../../../engine/findings';

@@ -1,4 +1,4 @@
-import { EmailSecurityData, Finding, CategoryScore } from '../../../types/audit';
+import type { EmailSecurityData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';

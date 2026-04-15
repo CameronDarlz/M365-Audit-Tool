@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Finding } from '../../../types/audit';
-import { remediationSteps, RemediationGuide } from '../../../engine/remediationSteps';
+import type { Finding } from '../../../types/audit';
+import { remediationSteps, type RemediationGuide } from '../../../engine/remediationSteps';
 import { severityBg, effortMinutesLabel, cn } from '../../../lib/utils';
 import { CheckSquare, Square, ExternalLink, ChevronDown, ChevronUp, Zap, Settings, ClipboardList } from 'lucide-react';
 

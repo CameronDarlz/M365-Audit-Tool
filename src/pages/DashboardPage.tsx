@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { AccountInfo } from '@azure/msal-browser';
+import { type AccountInfo } from '@azure/msal-browser';
 import { useAudit } from '../hooks/useAudit';
 import { Header } from '../components/layout/Header';
-import { TabBar, TabId } from '../components/layout/TabBar';
+import { TabBar, type TabId } from '../components/layout/TabBar';
 import { Overview } from '../components/dashboard/Overview';
 import { TabMfa } from '../components/dashboard/tabs/TabMfa';
 import { TabConditionalAccess } from '../components/dashboard/tabs/TabConditionalAccess';
@@ -32,7 +32,7 @@ export function DashboardPage({ account }: DashboardPageProps) {
       <div className="min-h-screen bg-background text-text">
         <Header organization={null} isRunning={isRunning} />
         {isRunning
-          ? <LoadingPage collectorStates={collectorStates} />
+          ? <LoadingPage states={collectorStates} />
           : <StartAuditPrompt onStart={startAudit} />}
       </div>
     );

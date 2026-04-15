@@ -1,4 +1,4 @@
-import { CollectorState } from '../types/audit';
+import type { CollectorState } from '../types/audit';
 import { CheckCircle2, XCircle, Loader2, Circle } from 'lucide-react';
 import { cn } from '../lib/utils';
 

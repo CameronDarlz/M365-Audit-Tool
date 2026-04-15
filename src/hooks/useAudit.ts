@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
-import { AccountInfo } from '@azure/msal-browser';
+import { type AccountInfo } from '@azure/msal-browser';
 import { runAudit } from '../api/runAudit';
 import { generateFindings } from '../engine/findings';
 import { computeScores, computeOverallScore, getGrade } from '../engine/scoring';
 import { buildAdminPrincipalIds } from '../engine/findings';
-import { AuditResult, CollectorState, ScoredAudit, CategoryScore } from '../types/audit';
+import type { AuditResult, CollectorState, ScoredAudit } from '../types/audit';
 
 const AUDIT_KEY = 'tenantAudit';
 

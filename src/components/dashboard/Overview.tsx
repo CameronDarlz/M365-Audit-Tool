@@ -1,4 +1,4 @@
-import { ScoredAudit } from '../../types/audit';
+import type { ScoredAudit } from '../../types/audit';
 import { ScoreRing } from './ScoreRing';
 import { FindingCard } from './FindingCard';
 import { formatDate, gradeColor } from '../../lib/utils';

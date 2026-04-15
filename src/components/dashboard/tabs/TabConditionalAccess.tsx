@@ -1,4 +1,4 @@
-import { ConditionalAccessData, Finding, CategoryScore } from '../../../types/audit';
+import type { ConditionalAccessData, Finding, CategoryScore } from '../../../types/audit';
 import { FindingCard } from '../FindingCard';
 import { ScoreRing } from '../ScoreRing';
 import { CheckCircle2, XCircle, MinusCircle, MapPin } from 'lucide-react';
