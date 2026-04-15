@@ -420,4 +420,325 @@ export const remediationSteps: Record<string, RemediationGuide> = {
     docsUrl: 'https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal',
   },
 
+  // ─── Devices ──────────────────────────────────────────────────────────────
+
+  'devices-no-enrolment': {
+    whyItMatters: 'Without device management, you cannot enforce compliance conditions in Conditional Access, apply security baselines, or remotely wipe devices if lost or stolen.',
+    steps: [
+      'This is a project-level change. Begin with a pilot group before full rollout.',
+      'Navigate to intune.microsoft.com → Devices → Enrol devices.',
+      'For Windows: configure Windows Autopilot or deploy the Intune MDM enrolment package via Group Policy.',
+      'For iOS/Android: deploy the Microsoft Intune app and configure an enrolment profile.',
+      'Create a compliance policy per platform: intune.microsoft.com → Devices → Compliance policies → Create policy.',
+      'Once devices are enrolled and compliant, add a Require compliant device condition to your admin CA policy.',
+    ],
+    estimatedMinutes: 240,
+    docsUrl: 'https://learn.microsoft.com/en-us/mem/intune/enrollment/device-enrollment',
+    caveats: 'Full device enrolment is a significant project. Scope and plan carefully — do not attempt to enrol all devices without a tested pilot and user communication plan.',
+  },
+
+  'devices-no-compliance-policy': {
+    whyItMatters: 'Without compliance policies, all enrolled devices default to compliant — making device-based Conditional Access controls completely ineffective.',
+    steps: [
+      'Navigate to intune.microsoft.com → Devices → Compliance policies → Create policy.',
+      'Create a policy for each platform in use (Windows, iOS, Android, macOS).',
+      'For Windows: require BitLocker encryption, minimum OS version, password required, firewall enabled.',
+      'For iOS/Android: require device encryption, minimum OS version, screen lock.',
+      'Assign each policy to All devices or the relevant device group.',
+      'Set a grace period of 7 days for initial rollout to avoid immediate lockouts.',
+    ],
+    estimatedMinutes: 60,
+    docsUrl: 'https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started',
+  },
+
+  'devices-high-noncompliance': {
+    whyItMatters: 'Non-compliant devices may lack encryption, security updates, or screen locks — making them easier targets for physical or network-based attacks.',
+    steps: [
+      'Navigate to intune.microsoft.com → Devices → Monitor → Noncompliant devices.',
+      'Export the list and sort by compliance issue type.',
+      'For OS version issues: push a Windows Update policy or notify users to update.',
+      'For encryption issues: push a BitLocker policy (Windows) or enable encryption enforcement (iOS/Android).',
+      'For devices that cannot be remediated: consider retiring and re-enrolling.',
+      'Set up automatic emails to device owners when their device becomes non-compliant.',
+    ],
+    estimatedMinutes: 60,
+    docsUrl: 'https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started',
+  },
+
+  'devices-stale-sync': {
+    whyItMatters: 'Devices not syncing with Intune are not receiving policy updates and their compliance state may be outdated, creating a false sense of security.',
+    steps: [
+      'Navigate to intune.microsoft.com → Devices → All devices → Filter by Last check-in: > 30 days.',
+      'For each stale device, check the device\'s ownership and last known user.',
+      'Contact the device owner to investigate — the device may be powered off, reimaged, or lost.',
+      'For devices confirmed as decommissioned: Retire the device in Intune to remove it from management.',
+      'For active devices with sync issues: troubleshoot the Intune management agent (run dsregcmd /status on Windows).',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/mem/intune/remote-actions/devices-wipe',
+  },
+
+  // ─── Identity Protection ──────────────────────────────────────────────────
+
+  'idp-high-risk-users': {
+    whyItMatters: 'High-risk users have been flagged by Microsoft\'s threat intelligence as likely compromised. These accounts may have active attacker sessions right now.',
+    steps: [
+      'Navigate to entra.microsoft.com → Protection → Identity Protection → Risky users.',
+      'Filter by Risk level: High.',
+      'For each high-risk user: click the account → select Confirm user compromised.',
+      'Immediately require a password reset: select the user → Reset password.',
+      'Review the user\'s recent sign-in activity for suspicious sign-ins.',
+      'Once remediated, dismiss the risk: select user → Dismiss user risk.',
+      'Enable a risk-based CA policy to automate this in future (see ca-no-risk-policy).',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-remediate-unblock',
+    caveats: 'Treat high-risk users as actively compromised until proven otherwise. Prioritise admin accounts above all others.',
+  },
+
+  'idp-medium-risk-users': {
+    whyItMatters: 'Medium-risk users have exhibited anomalous sign-in behaviour that warrants investigation, such as atypical travel or unfamiliar sign-in properties.',
+    steps: [
+      'Navigate to entra.microsoft.com → Protection → Identity Protection → Risky users.',
+      'Filter by Risk level: Medium.',
+      'For each account, review the risk detections to understand why the account was flagged.',
+      'Contact the user to confirm whether the sign-in was legitimate.',
+      'If confirmed legitimate: dismiss the risk.',
+      'If suspicious: require password reset and MFA re-registration.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-remediate-unblock',
+  },
+
+  'idp-no-p2': {
+    whyItMatters: 'Without Entra ID P2, risk-based sign-in policies and leaked credential detection are unavailable, leaving the tenant blind to identity-based attacks.',
+    steps: [
+      'Review current licence assignments: admin.microsoft.com → Billing → Your products.',
+      'Identify how many users require P2 features (typically all licensed users).',
+      'Compare cost of Entra ID P2 add-on vs upgrading to Microsoft 365 E3 or E5.',
+      'If budget allows, procure Entra ID P2 or Microsoft 365 E5 licences.',
+      'Once licences are assigned, configure risk-based CA policies (see ca-no-risk-policy).',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/overview-identity-protection',
+  },
+
+  'idp-recent-detections': {
+    whyItMatters: 'Recent risk detections indicate suspicious activity has occurred. Even if accounts appear uncompromised, each detection warrants review.',
+    steps: [
+      'Navigate to entra.microsoft.com → Protection → Identity Protection → Risk detections.',
+      'Review each detection in the past 30 days.',
+      'For each detection, open the associated sign-in and confirm it was legitimate with the user.',
+      'For detections that cannot be confirmed: treat the account as compromised — reset password and MFA.',
+      'Enable a risk-based CA policy to automatically challenge risky sign-ins in future.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks',
+  },
+
+  // ─── External Collaboration ───────────────────────────────────────────────
+
+  'extcollab-open-guest-invite': {
+    whyItMatters: 'When any user including existing guests can invite external users, the guest population grows uncontrolled and without IT visibility.',
+    steps: [
+      'Navigate to entra.microsoft.com → External Identities → External collaboration settings.',
+      'Under Guest invite settings, change to "Member users and users assigned to specific admin roles can invite guest users".',
+      'Click Save.',
+    ],
+    estimatedMinutes: 5,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure',
+  },
+
+  'extcollab-email-verified-join': {
+    whyItMatters: 'Allowing email-verified users to self-join creates an open registration flow — any person with a valid email can gain access to your tenant resources.',
+    steps: [
+      'Navigate to entra.microsoft.com → External Identities → External collaboration settings.',
+      'Find "Allow external users to sign up through Azure AD B2B collaboration" or "Email one-time passcode" settings.',
+      'Disable "Allow email verified users to join your organization".',
+      'Click Save.',
+    ],
+    estimatedMinutes: 5,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure',
+  },
+
+  'extcollab-guest-full-access': {
+    whyItMatters: 'Guests with member-level access can enumerate all users, groups, and other guests in the directory — giving them a full map of your organisation.',
+    steps: [
+      'Navigate to entra.microsoft.com → External Identities → External collaboration settings.',
+      'Under Guest user access, select "Guest users have limited access to properties and memberships of directory objects".',
+      'Click Save.',
+      'This limits guests to seeing only their own profile and the resources they have been explicitly granted access to.',
+    ],
+    estimatedMinutes: 5,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions',
+  },
+
+  // ─── Governance ───────────────────────────────────────────────────────────
+
+  'governance-no-group-expiry': {
+    whyItMatters: 'Without expiration policies, Microsoft 365 groups and Teams accumulate indefinitely. Abandoned groups retain access to files and data even after projects end.',
+    steps: [
+      'Navigate to entra.microsoft.com → Groups → Expiration.',
+      'Set Group lifetime (days) to 180 or 365 depending on your organisation\'s preference.',
+      'Enable expiration for All groups, or select a pilot group first.',
+      'Set the notification email address for groups with no owners.',
+      'Click Save. Group owners will receive renewal prompts 30 days before expiry.',
+    ],
+    estimatedMinutes: 10,
+    docsUrl: 'https://learn.microsoft.com/en-us/entra/identity/users/groups-lifecycle',
+  },
+
+  'governance-open-group-creation': {
+    whyItMatters: 'Unrestricted group creation leads to Teams and SharePoint sprawl, making governance, data classification, and access reviews unmanageable.',
+    steps: [
+      'Create a security group called "Group-Creators" (or similar) in entra.microsoft.com → Groups → New group.',
+      'Add approved users or the IT team as members.',
+      'Navigate to entra.microsoft.com → Groups → Settings.',
+      'Under the "General" settings, find "Users who can create Microsoft 365 groups in Azure portals, API or PowerShell".',
+      'Change to Selected and select the Group-Creators security group.',
+      'Click Save.',
+    ],
+    estimatedMinutes: 15,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/manage-creation-of-groups',
+    caveats: 'Communicate this change to users before enforcing — they will receive an error if they try to create a team or group without being in the approved group.',
+  },
+
+  'governance-groups-no-owners': {
+    whyItMatters: 'Ownerless groups cannot receive expiration renewal requests and have no accountable person to manage membership or decommission the group.',
+    steps: [
+      'Export the ownerless group list from the Governance tab.',
+      'For each group, identify who created it or who the primary stakeholders are.',
+      'Assign an owner: navigate to the group in entra.microsoft.com → Groups → select group → Owners → Add owners.',
+      'For groups with no identifiable owner that appear inactive, consider deleting them after confirming no active members require the resource.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/microsoft-365-groups-expiration-policy',
+  },
+
+  'governance-public-groups': {
+    whyItMatters: 'Public groups allow any tenant user to view content and join without approval, which may expose sensitive project data or internal communications.',
+    steps: [
+      'Review the list of public groups in the Governance tab.',
+      'For each group, assess whether the content is appropriate for all-staff visibility.',
+      'To change visibility: navigate to admin.microsoft.com → Teams & groups → Active teams & groups → select group → Settings → Privacy → Private.',
+      'Communicate the change to group members before switching to Private.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/solutions/groups-teams-access-governance',
+  },
+
+  // ─── Email Security ───────────────────────────────────────────────────────
+
+  'email-no-spf': {
+    whyItMatters: 'Without an SPF record, any server can send email appearing to come from your domain. This enables phishing and spoofing attacks against your clients and staff.',
+    steps: [
+      'Log in to your DNS provider (e.g. Cloudflare, GoDaddy, 123-reg).',
+      'Add a TXT record on the root domain (@).',
+      'Value: v=spf1 include:spf.protection.outlook.com -all',
+      'TTL: 3600 (1 hour) or your provider\'s default.',
+      'If you send email from other services (Mailchimp, HubSpot, etc.), add their include mechanisms before -all.',
+      'Verify after propagation using mxtoolbox.com/spf.',
+    ],
+    estimatedMinutes: 15,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-spf-configure',
+  },
+
+  'email-spf-not-enforced': {
+    whyItMatters: 'An SPF record ending in ~all or ?all does not instruct receiving servers to reject spoofed email — it only suggests they might flag it.',
+    steps: [
+      'Log in to your DNS provider.',
+      'Find your existing TXT record for the root domain containing v=spf1.',
+      'Change the final mechanism from ~all or ?all to -all.',
+      'Example result: v=spf1 include:spf.protection.outlook.com -all',
+      'Save the record and verify at mxtoolbox.com/spf.',
+    ],
+    estimatedMinutes: 10,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-spf-configure',
+    caveats: 'Before switching to -all, confirm all legitimate sending sources are included in the SPF record. Use mxtoolbox.com/emailhealth to check all sending IPs.',
+  },
+
+  'email-no-dmarc': {
+    whyItMatters: 'Without DMARC, receiving servers have no instruction on what to do with email that fails SPF or DKIM authentication. Spoofed email may still be delivered.',
+    steps: [
+      'Log in to your DNS provider.',
+      'Add a TXT record at _dmarc.yourdomain.com.',
+      'Start with: v=DMARC1; p=none; rua=mailto:dmarc-reports@yourdomain.com',
+      'The p=none policy enables monitoring without rejecting email.',
+      'Review DMARC aggregate reports for 2–4 weeks to confirm all legitimate mail passes.',
+      'Update to p=quarantine, then after another 2–4 weeks, update to p=reject.',
+    ],
+    estimatedMinutes: 20,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+    caveats: 'Never start with p=reject. Always begin with p=none, review reports, then escalate incrementally.',
+  },
+
+  'email-dmarc-not-enforced': {
+    whyItMatters: 'A DMARC record with p=none means receiving servers take no action on emails that fail authentication. The record exists but provides no protection.',
+    steps: [
+      'Review your DMARC aggregate reports (sent to the rua= address) to confirm all legitimate mail passes SPF and DKIM.',
+      'Use a DMARC reporting tool (e.g. dmarcian.com or Google Postmaster Tools) to visualise failures.',
+      'Once confident all legitimate mail passes, update the DNS TXT record at _dmarc.yourdomain.com.',
+      'Change p=none to p=quarantine.',
+      'Monitor for 2–4 weeks. If no issues, change to p=reject.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+  },
+
+  'email-dmarc-no-reporting': {
+    whyItMatters: 'Without a DMARC reporting address, you have no visibility into authentication failures or spoofing attempts against your domain.',
+    steps: [
+      'Log in to your DNS provider.',
+      'Find your existing TXT record at _dmarc.yourdomain.com.',
+      'Add rua=mailto:dmarc-reports@yourdomain.com to the record.',
+      'Example: v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.com',
+      'Save and verify with mxtoolbox.com/dmarc.',
+    ],
+    estimatedMinutes: 10,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dmarc-configure',
+  },
+
+  'email-no-dkim': {
+    whyItMatters: 'Without DKIM, email from your domain cannot be cryptographically verified. DKIM is required for DMARC alignment and prevents message tampering in transit.',
+    steps: [
+      'Navigate to security.microsoft.com → Email & collaboration → Policies & rules → Threat policies → Email authentication settings → DKIM.',
+      'Select your domain and click Enable.',
+      'Microsoft will display two CNAME records: selector1._domainkey.yourdomain.com and selector2._domainkey.yourdomain.com.',
+      'Add both CNAME records to your DNS provider.',
+      'Wait for DNS propagation (up to 48 hours), then return to the DKIM page and click Enable again.',
+      'Verify with mxtoolbox.com/dkim.',
+    ],
+    estimatedMinutes: 25,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-dkim-configure',
+  },
+
+  'email-third-party-mx': {
+    whyItMatters: 'A third-party mail gateway changes the SPF and DKIM alignment requirements. Misconfiguration here can cause legitimate mail to fail authentication.',
+    steps: [
+      'Identify the mail gateway in use from the MX record.',
+      'Ensure the gateway\'s sending IPs are included in your SPF record.',
+      'Confirm DKIM signing is configured in the gateway (not just Exchange Online).',
+      'Verify DMARC alignment — the From domain must align with either the SPF or DKIM signing domain.',
+      'Consult your gateway vendor\'s documentation for Microsoft 365 integration.',
+    ],
+    estimatedMinutes: 30,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/email-authentication-about',
+  },
+
+  // ─── Secure Score ─────────────────────────────────────────────────────────
+
+  'securescore-low': {
+    whyItMatters: 'Microsoft Secure Score reflects the overall implementation of recommended security controls across identity, data, devices, and apps.',
+    steps: [
+      'Navigate to security.microsoft.com → Secure score.',
+      'Click the Recommended actions tab.',
+      'Filter by: Status = To address, Category = Identity. Sort by Points impact descending.',
+      'Work through the top 5 highest-impact actions — each has a step-by-step guide within the portal.',
+      'After completing each action, mark it as Addressed to update your score.',
+    ],
+    estimatedMinutes: 60,
+    docsUrl: 'https://learn.microsoft.com/en-us/microsoft-365/security/defender/microsoft-secure-score-improvement-actions',
+    caveats: 'Some improvements require Entra ID P2 or Defender for Office 365 Plan 2. Filter by your available licence tier.',
+  },
+
 };
