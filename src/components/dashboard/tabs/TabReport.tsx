@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ScoredAudit } from '../../../types/audit';
 import { remediationSteps } from '../../../engine/remediationSteps';
 import { gradeColor, severityColor, effortMinutesLabel, formatDateTime } from '../../../lib/utils';
-import { Printer } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
+import { AuditReportPDF } from '../AuditReportPDF';
 
 interface TabReportProps {
   audit: ScoredAudit;
@@ -19,6 +21,7 @@ const GRADE_LABEL: Record<string, string> = {
 
 export function TabReport({ audit }: TabReportProps) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const { result, scores, overallScore, overallGrade, findings } = audit;
   const org = result.org.organization;
   const domain = result.emailSecurity.domain || org?.verifiedDomains.find(d => d.isDefault)?.name || '—';
@@ -33,20 +36,47 @@ export function TabReport({ audit }: TabReportProps) {
     return acc;
   }, {});
 
+  async function handleDownloadPdf() {
+    setPdfLoading(true);
+    try {
+      const blob = await pdf(<AuditReportPDF audit={audit} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const tenantName = org?.displayName ?? domain;
+      a.href = url;
+      a.download = `M365-Audit-${tenantName.replace(/[^a-z0-9]/gi, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   function handlePrint() {
     window.print();
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Print button — hidden when printing */}
-      <div className="flex justify-end no-print">
+      {/* Action buttons */}
+      <div className="flex justify-end gap-2 no-print">
+        <button
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20
+            text-blue-400 text-sm font-medium hover:bg-blue-500/20 disabled:opacity-50 transition-colors"
+        >
+          {pdfLoading
+            ? <span className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+            : <Download size={14} />}
+          {pdfLoading ? 'Generating…' : 'Download PDF'}
+        </button>
         <button
           onClick={handlePrint}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20
-            text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#162032] border border-[#1e3a5f]
+            text-muted text-sm font-medium hover:text-text hover:border-[#1e3a5f]/80 transition-colors"
         >
-          <Printer size={14} /> Print / Save as PDF
+          <Printer size={14} /> Print
         </button>
       </div>
 
