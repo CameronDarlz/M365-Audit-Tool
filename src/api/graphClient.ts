@@ -1,14 +1,24 @@
-import { type IPublicClientApplication, type AccountInfo } from '@azure/msal-browser';
+import { type IPublicClientApplication, type AccountInfo, InteractionRequiredAuthError } from '@azure/msal-browser';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const GRAPH_BETA = 'https://graph.microsoft.com/beta';
 
+const TOKEN_REQUEST = { scopes: ['https://graph.microsoft.com/.default'] };
+
 async function getToken(instance: IPublicClientApplication, account: AccountInfo): Promise<string> {
-  const response = await instance.acquireTokenSilent({
-    scopes: ['https://graph.microsoft.com/.default'],
-    account,
-  });
-  return response.accessToken;
+  try {
+    const response = await instance.acquireTokenSilent({ ...TOKEN_REQUEST, account });
+    return response.accessToken;
+  } catch (e) {
+    if (e instanceof InteractionRequiredAuthError) {
+      // Silent renewal failed — redirect to Microsoft for a fresh token.
+      // The page navigates away; when it returns MSAL will have a cached token.
+      await instance.acquireTokenRedirect({ ...TOKEN_REQUEST, account });
+      // This line is never reached — throw so TypeScript knows the function exits
+      throw new Error('Redirecting for re-authentication…');
+    }
+    throw e;
+  }
 }
 
 export async function graphGet<T>(

@@ -12,19 +12,15 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await instance.loginPopup(loginRequest);
+      await instance.loginRedirect(loginRequest);
+      // Page navigates away — code below will not run
     } catch (e: unknown) {
       const err = e as { errorCode?: string; message?: string };
-      if (err?.errorCode === 'user_cancelled') {
-        // silent — user dismissed popup
-      } else if (err?.errorCode === 'popup_window_error') {
-        setError('Popup was blocked. Please allow popups for this site and try again.');
-      } else if (err?.errorCode === 'consent_required' || err?.errorCode === 'interaction_required') {
+      if (err?.errorCode === 'consent_required' || err?.errorCode === 'interaction_required') {
         setError('Admin consent is required. Ask your Global Administrator to sign in first and approve the permissions.');
       } else {
         setError(err?.message ?? 'Sign-in failed. Please try again.');
       }
-    } finally {
       setLoading(false);
     }
   }
