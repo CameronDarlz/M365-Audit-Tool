@@ -20,7 +20,7 @@ export async function collectGroups(
     safeGraphGetAll<Group>(
       instance,
       account,
-      "/groups?$filter=groupTypes/any(c:c eq 'Unified')&$select=id,displayName,members,owners,visibility,resourceProvisioningOptions,groupTypes&$top=200",
+      "/groups?$filter=groupTypes/any(c:c eq 'Unified')&$select=id,displayName,visibility,resourceProvisioningOptions,groupTypes&$expand=owners($select=id,displayName)&$top=100",
     ),
   ]);
 
